@@ -2,6 +2,7 @@ package org.blog.blog.configs;
 
 import org.blog.blog.configs.filters.LoginFilter;
 import org.blog.blog.configs.filters.RequestProcessingJWTFilter;
+import org.blog.blog.servises.impl.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +26,7 @@ public class SecurityConfiguration {
     private final UserDetailsService userDetailsService;
 
     @Autowired
-    public SecurityConfiguration(UserDetailsService userDetailsService) {
+    public SecurityConfiguration(UserDetailsServiceImpl userDetailsService) {
         this.userDetailsService = userDetailsService;
     }
 
@@ -33,14 +34,16 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         return httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
+                .addFilterBefore(new RequestProcessingJWTFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new LoginFilter("/login", authenticationManager(httpSecurity.getSharedObject(AuthenticationConfiguration.class))), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(registry -> {
                     registry.requestMatchers("/css/**", "/vendor/**", "/images/**", "/fonts/**", "/js/**").permitAll();
-                    registry.requestMatchers("/login", "/blog/**", "/registration").permitAll();
+                    registry.requestMatchers("/login", "/registration").permitAll();
+                    registry.requestMatchers("/login", "/blog/**" , "/blog").hasAnyAuthority( "ADMIN");
                     registry.requestMatchers("/account").hasAnyAuthority("USER", "ADMIN");
                     registry.anyRequest().authenticated();
                 })
-                .addFilterBefore(new RequestProcessingJWTFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new LoginFilter("/login", authenticationManager(httpSecurity.getSharedObject(AuthenticationConfiguration.class))), UsernamePasswordAuthenticationFilter.class)
+
                 .build();
     }
 
@@ -60,7 +63,8 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 }
